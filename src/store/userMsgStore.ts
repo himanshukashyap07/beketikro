@@ -31,46 +31,45 @@ export const useMsgStore = create<MsgStore>((set, get) => ({
 
   setEditingId: (id) => set({ editingId: id }),
 
-  // GET all messages
+  // 🔥 GET + SORT newest → oldest
   fetchMsgs: async () => {
     set({ loading: true });
     try {
       const res = await axios.get("/api/getMessages");
-      const filtered = res.data.msg.filter((m: any) => m.isDelete === false);
 
-      set({ msgs: filtered });  // <-- Fixed
+      const filtered = res.data.msg
+        .filter((m: any) => m.isDelete === false)
+        .sort(
+          (a: Message, b: Message) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+      set({ msgs: filtered });
     } finally {
       set({ loading: false });
     }
   },
 
-  // POST create message
+  // 🔥 ADD + AUTO REFRESH
   addMsg: async (content) => {
-    const res = await axios.post("/api/sendMsg", { content });
+    await axios.post("/api/sendMsg", { content });
 
-    set((state) => ({
-      msgs: [...state.msgs, res.data.msg], // <-- Correct key
-    }));
+    // force update after add
+    await get().fetchMsgs();
   },
 
-  // PUT update message
+  // 🔥 UPDATE + AUTO REFRESH
   updateMsg: async (id, content) => {
     await axios.put(`/api/msgUpdate/${id}`, { content });
 
-    set((state) => ({
-      msgs: state.msgs.map((m) =>
-        m._id === id ? { ...m, content } : m
-      ),
-      editingId: null,
-    }));
+    await get().fetchMsgs(); // refresh again with newest order
+    set({ editingId: null });
   },
 
-  // DELETE message
+  // 🔥 DELETE + AUTO REFRESH
   deleteMsg: async (id) => {
     await axios.patch(`/api/msgDelete/${id}`);
 
-    set((state) => ({
-      msgs: state.msgs.filter((m) => m.isDelete !== true),
-    }));
+    await get().fetchMsgs(); // refresh list after delete
   },
 }));
